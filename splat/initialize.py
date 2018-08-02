@@ -8,28 +8,28 @@ from __future__ import print_function, division
 
 import os
 import sys
+import numpy
+import pandas
 from astropy import units as u
 
 
-# things that are constants
-VERSION = '2018.05.21'
+# program constants
+VERSION = '2018.07.29'
 __version__ = VERSION
 SPLAT_URL = 'http://splat.physics.ucsd.edu/splat/'
 DOCUMENTATION_URL = 'http://pono.ucsd.edu/~adam/splat/'
 GITHUB_URL = 'https://github.com/aburgasser/splat/'
 BIBCODE = '2017arXiv170700062B'
 EMAIL = 'aburgasser@gmail.com'
-DB_SOURCES_FILE = 'source_data.txt'
-DB_SPECTRA_FILE = 'spectral_data.txt'
-DB_PHOTOMETRY_FILE = 'photometry_data.txt'
+INSTRUMENT_DEFINITION_FILE = 'instrument.txt'
+# no longer used
+#DB_PHOTOMETRY_FILE = 'photometry_data.txt'
 BIBFILE = 'splat_bibs.bib'
 TMPFILENAME = 'splattmpfile'
 HOME_FOLDER = os.path.expanduser('~')
-DATA_FOLDER = '/reference/Spectra/'
-DATA_FOLDERS = [DATA_FOLDER]
-FILTER_FOLDER = '/reference/Filters/'
-SPECTRAL_MODEL_FOLDER = '/reference/SpectralModels/'
-EVOLUTIONARY_MODEL_FOLDER = '/reference/EvolutionaryModels/'
+FILTER_FOLDER = '/resources/Filters/'
+SPECTRAL_MODEL_FOLDER = '/resources/SpectralModels/'
+EVOLUTIONARY_MODEL_FOLDER = '/resources/EvolutionaryModels/'
 DOCS_FOLDER = '/docs/'
 DOCS_INDEX_HTML = '/docs/_build/html/index.html'
 WEB_HTML_BASE = '/docs/_templates/'
@@ -37,7 +37,6 @@ DB_FOLDER = '/db/'
 ACCESS_FILE = '.splat_access'
 EXTERNAL_SPECTRAL_MODELS_FILE = '.splat_spectral_models'
 EXTERNAL_EVOLUTIONARY_MODELS_FILE = '.splat_evolutionary_models'
-EXTERNAL_DATA_FILE = '.splat_data'
 MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 
 # SPLAT authors
@@ -92,16 +91,36 @@ SPLAT_USER_MODELS = './'
 if os.environ.get('SPLAT_MODELS') != None:
     SPLAT_USER_MODELS = os.environ['SPLAT_MODELS']
 
-#set user SPLAT model path from environmental variable
-SPLAT_USER_DATA = './'
-if os.environ.get('SPLAT_DATA') != None:
-    SPLAT_USER_DATA = os.environ['SPLAT_DATA']
 
 # Unit standards
 DEFAULT_WAVE_UNIT = u.micron
 DEFAULT_FLUX_UNIT = u.erg/u.s/u.cm/u.cm/u.micron
 DEFAULT_SED_UNIT = u.erg/u.s/u.cm/u.cm
 
+
+# Spectral data parameters
+DATA_FOLDER = '/resources/Spectra/SPEX-PRISM/'
+EXTERNAL_DATA_FILE = '.splat_data'
+DB_SOURCES_FILE = 'source_data.txt'
+DB_SPECTRA_FILE = 'spectral_data.txt'
+DB_SPECTRA_DEFAULT_PARAMETERS = {
+    'DATA_FILE': {'altname': ['FILE','FILENAME'], 'type': str},
+    'DATA_KEY': {'altname': [], 'type': int},
+    'INSTRUMENT': {'altname': [], 'type': str},
+    'BIBCODE': {'altname': ['DATA_BIBCODE','REFERENCE','REF','BIBCODE','BIB','DATA_REFERENCE','DATA_REF'], 'type': str},
+    'OBSERVATION_DATE': {'altname': ['OBSDATE','OBS_DATE','DATE'], 'type': str},
+    'OBSERVATION_MJD': {'altname': ['MJD','OBS_MJD','JULIAN_DATE'], 'type': float},
+    'PROGRAM': {'altname': [], 'type': str},
+    'OBSERVER': {'altname': [], 'type': str},
+    'AIRMASS': {'altname': ['Z'], 'type': float},
+    'INTEGRATION': {'altname': ['TINT','TIME','INT_TIME','INTEGRATION_TIME'], 'type': float},
+    'CONDITIONS': {'altname': ['WEATHER'], 'type': float},
+    'SOURCE_KEY': {'altname': [], 'type': int},
+    'NAME': {'altname': ['SOURCE_NAME'], 'type': str},
+    'DESIGNATION': {'altname': ['DESIG'], 'type': str},
+    'RA': {'altname': ['RIGHT_ASCENSION'], 'type': float},
+    'DEC': {'altname': ['DECLINATION'], 'type': float},
+}
 
 # dwarf spectral standards
 STDS_DWARF_SPEX_KEYS = { \
@@ -245,22 +264,22 @@ FILTERS = { \
     'MKO_KP': {'file': 'mko_kp.txt', 'description': 'MKO Kp-band', 'zeropoint': 693.7, 'method': 'vega', 'rsr': False, 'altname': ['mko k prime']}, \
     'MKO_LP': {'file': 'mko_lp.txt', 'description': 'MKO Lp-band', 'zeropoint': 248.3, 'method': 'vega', 'rsr': False, 'altname': ['mko l','mko l prime']}, \
     'MKO_MP': {'file': 'mko_mp.txt', 'description': 'MKO Mp-band', 'zeropoint': 164.7, 'method': 'vega', 'rsr': False, 'altname': ['mko m','mko m prime']}, \
-    'NICMOS_F090M': {'file': 'nic1_f090m.txt', 'description': 'NICMOS F090M', 'zeropoint': 2255.0, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F095N': {'file': 'nic1_f095n.txt', 'description': 'NICMOS F095N', 'zeropoint': 2044.6, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F097N': {'file': 'nic1_f097n.txt', 'description': 'NICMOS F097N', 'zeropoint': 2275.4, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F108N': {'file': 'nic1_f108n.txt', 'description': 'NICMOS F108N', 'zeropoint': 1937.3, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F110M': {'file': 'nic1_f110m.txt', 'description': 'NICMOS F110M', 'zeropoint': 1871.8, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F110W': {'file': 'nic1_f110w.txt', 'description': 'NICMOS F110W', 'zeropoint': 1768.5, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F113N': {'file': 'nic1_f113n.txt', 'description': 'NICMOS F113N', 'zeropoint': 1821.0, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F140W': {'file': 'nic1_f140w.txt', 'description': 'NICMOS F140W', 'zeropoint': 1277.1, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F145M': {'file': 'nic1_f145m.txt', 'description': 'NICMOS F145M', 'zeropoint': 1242.0, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F160W': {'file': 'nic1_f160w.txt', 'description': 'NICMOS F160W', 'zeropoint': 1071.7, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F164N': {'file': 'nic1_f164n.txt', 'description': 'NICMOS F164N', 'zeropoint': 1003.0, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F165M': {'file': 'nic1_f165m.txt', 'description': 'NICMOS F165M', 'zeropoint': 1023.6, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F166N': {'file': 'nic1_f166n.txt', 'description': 'NICMOS F166N', 'zeropoint': 1047.7, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F170M': {'file': 'nic1_f170m.txt', 'description': 'NICMOS F170M', 'zeropoint': 979.1, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F187N': {'file': 'nic1_f187n.txt', 'description': 'NICMOS F187N', 'zeropoint': 803.7, 'method': 'vega', 'rsr': False, 'altname': []}, \
-    'NICMOS_F190N': {'file': 'nic1_f190n.txt', 'description': 'NICMOS F190N', 'zeropoint': 836.5, 'method': 'vega', 'rsr': False, 'altname': []}, \
+    'NICMOS_F090M': {'file': 'nic1_f090m.txt', 'description': 'NICMOS F090M', 'zeropoint': 2255.0, 'method': 'vega', 'rsr': False, 'altname': ['F090M']}, \
+    'NICMOS_F095N': {'file': 'nic1_f095n.txt', 'description': 'NICMOS F095N', 'zeropoint': 2044.6, 'method': 'vega', 'rsr': False, 'altname': ['F095N']}, \
+    'NICMOS_F097N': {'file': 'nic1_f097n.txt', 'description': 'NICMOS F097N', 'zeropoint': 2275.4, 'method': 'vega', 'rsr': False, 'altname': ['F097N']}, \
+    'NICMOS_F108N': {'file': 'nic1_f108n.txt', 'description': 'NICMOS F108N', 'zeropoint': 1937.3, 'method': 'vega', 'rsr': False, 'altname': ['F108N']}, \
+    'NICMOS_F110M': {'file': 'nic1_f110m.txt', 'description': 'NICMOS F110M', 'zeropoint': 1871.8, 'method': 'vega', 'rsr': False, 'altname': ['F110M']}, \
+    'NICMOS_F110W': {'file': 'nic1_f110w.txt', 'description': 'NICMOS F110W', 'zeropoint': 1768.5, 'method': 'vega', 'rsr': False, 'altname': ['F110W']}, \
+    'NICMOS_F113N': {'file': 'nic1_f113n.txt', 'description': 'NICMOS F113N', 'zeropoint': 1821.0, 'method': 'vega', 'rsr': False, 'altname': ['F113N']}, \
+    'NICMOS_F140W': {'file': 'nic1_f140w.txt', 'description': 'NICMOS F140W', 'zeropoint': 1277.1, 'method': 'vega', 'rsr': False, 'altname': ['F140W']}, \
+    'NICMOS_F145M': {'file': 'nic1_f145m.txt', 'description': 'NICMOS F145M', 'zeropoint': 1242.0, 'method': 'vega', 'rsr': False, 'altname': ['F145M']}, \
+    'NICMOS_F160W': {'file': 'nic1_f160w.txt', 'description': 'NICMOS F160W', 'zeropoint': 1071.7, 'method': 'vega', 'rsr': False, 'altname': ['F160W']}, \
+    'NICMOS_F164N': {'file': 'nic1_f164n.txt', 'description': 'NICMOS F164N', 'zeropoint': 1003.0, 'method': 'vega', 'rsr': False, 'altname': ['F164N']}, \
+    'NICMOS_F165M': {'file': 'nic1_f165m.txt', 'description': 'NICMOS F165M', 'zeropoint': 1023.6, 'method': 'vega', 'rsr': False, 'altname': ['F165M']}, \
+    'NICMOS_F166N': {'file': 'nic1_f166n.txt', 'description': 'NICMOS F166N', 'zeropoint': 1047.7, 'method': 'vega', 'rsr': False, 'altname': ['F166N']}, \
+    'NICMOS_F170M': {'file': 'nic1_f170m.txt', 'description': 'NICMOS F170M', 'zeropoint': 979.1, 'method': 'vega', 'rsr': False, 'altname': ['F170M']}, \
+    'NICMOS_F187N': {'file': 'nic1_f187n.txt', 'description': 'NICMOS F187N', 'zeropoint': 803.7, 'method': 'vega', 'rsr': False, 'altname': ['F187N']}, \
+    'NICMOS_F190N': {'file': 'nic1_f190n.txt', 'description': 'NICMOS F190N', 'zeropoint': 836.5, 'method': 'vega', 'rsr': False, 'altname': ['F190N']}, \
     'NIRC2_J': {'file': 'nirc2-j.txt', 'description': 'NIRC2 J-band', 'zeropoint': 1562.7, 'method': 'vega', 'rsr': False, 'altname': []}, \
     'NIRC2_H': {'file': 'nirc2-h.txt', 'description': 'NIRC2 H-band', 'zeropoint': 1075.5, 'method': 'vega', 'rsr': False, 'altname': []}, \
     'NIRC2_HCONT': {'file': 'nirc2-hcont.txt', 'description': 'NIRC2 H-continuum band', 'zeropoint': 1044.5, 'method': 'vega', 'rsr': False, 'altname': []}, \
@@ -372,33 +391,42 @@ FILTERS = { \
 VEGAFILE = 'vega_kurucz.txt'
 
 # some data formats (for future expansion)
+INSTRUMENT_DEFAULT_PARAMETERS = {
+    'instrument_name': {'altname': ['name','instrument','inst'], 'type': str, 'default': 'UNKNOWN'},
+    'altname': {'altname': ['name','instrument','inst'], 'type': str, 'default': []},
+    'bibcode': {'altname': ['name','instrument','inst'], 'type': str, 'default': ''},
+    'resolution': {'altname': ['name','instrument','inst'], 'type': float, 'default': numpy.nan},
+    'wunit': {'altname': ['name','instrument','inst'], 'type': u.quantity.Quantity, 'default': u.micron},
+    'funit': {'altname': ['name','instrument','inst'], 'type': u.quantity.Quantity, 'default': u.erg/u.s/u.cm/u.cm/u.micron}
+    }
+
 INSTRUMENTS = {
 #	'SPEX': {'instrument_name': 'SpeX prism', 'pixelscale': 0.15*u.arcsec, 'wave_range': [0.7,2.5]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 200, 'norders': 1, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': ['']},
-    'UNKNOWN': {'instrument_name': 'UNKNOWN', 'pixelscale': 1.*u.arcsec, 'slitwidth': 1.*u.arcsec, 'altname': ['UNK'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
+#    'UNKNOWN': {'instrument_name': 'UNKNOWN', 'pixelscale': 1.*u.arcsec, 'slitwidth': 1.*u.arcsec, 'altname': ['UNK'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
     'RAW': {'instrument_name': 'RAW', 'pixelscale': 1.*u.arcsec, 'slitwidth': 1.*u.arcsec, 'altname': [], 'wunit': u.micron},
     'SED': {'instrument_name': 'SED', 'pixelscale': 1.*u.arcsec, 'wave_range': [0.1,100]*u.micron, 'slitwidth': 1.*u.arcsec, 'altname': ['SPECTRAL_ENERGY_DISTRIBUTION'], 'resolution': 100, 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'APOGEE': {'instrument_name': 'SDSS APOGEE', 'pixelscale': 2./3.*u.arcsec, 'wave_range': [1.51,1.70]*u.micron, 'slitwidth': 2.*u.arcsec, 'resolution': 22500, 'norders': 1, 'readnoise': 0, 'darkcurrent': 0., 'gain': 1, 'altname': ['APO'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'BOSS': {'instrument_name': 'SDSS BOSS', 'pixelscale': 2./3.*u.arcsec, 'wave_range': [3700,10400]*u.Angstrom, 'slitwidth': 2.*u.arcsec, 'resolution': 2000, 'norders': 1, 'readnoise': 0, 'darkcurrent': 0., 'gain': 1, 'altname': ['SDSS','BOSS','EBOSS'], 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom},
-    'DEIMOS': {'instrument_name': 'Keck DEIMOS', 'pixelscale': 0.1185*u.arcsec, 'wave_range': [5000,9700]*u.Angstrom, 'slitwidth': 1.*u.arcsec, 'disperser': '600 l/mm', 'resolution': 2000, 'norders': 1, 'readnoise': 2.5, 'darkcurrent': 0., 'gain': 1.2, 'altname': ['DEIMOS'], 'instrument_reference': '2003spie.4841.1657F', 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom},
-    'FIRE': {'instrument_name': 'Magellan FIRE', 'pixelscale': 0.18*u.arcsec, 'wave_range': [0.82,2.51]*u.micron, 'slitwidth': 0.6*u.arcsec, 'resolution': 6000, 'norders': 21, 'readnoise': 0, 'darkcurrent': 0., 'gain': 1, 'altname': ['FIRE'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'IRS-SL': {'instrument_name': 'Spitzer IRS Short-Low', 'pixelscale': 1.8*u.arcsec, 'wave_range': [5.2,14.5]*u.micron, 'slitwidth': 1.8*u.arcsec, 'resolution': 100, 'norders': 1, 'readnoise': 30., 'darkcurrent': 10., 'gain': 4.6, 'altname': ['IRS','IRS Short Low'], 'wunit': u.micron, 'funit': u.Jy},
-    'IRS-LL': {'instrument_name': 'Spitzer IRS Short-Low', 'pixelscale': 5.1*u.arcsec, 'wave_range': [14,38.]*u.micron, 'slitwidth': 5.1*u.arcsec, 'resolution': 90, 'norders': 1, 'readnoise': 30., 'darkcurrent': 40., 'gain': 4.6, 'altname': ['IRS Long Low'], 'wunit': u.micron, 'funit': u.Jy},
+    'APOGEE': {'instrument_name': 'SDSS APOGEE', 'pixelscale': 2./3.*u.arcsec, 'wave_range': [1.51,1.70]*u.micron, 'slitwidth': 2.*u.arcsec, 'resolution': 22500, 'norders': 1, 'readnoise': 0, 'darkcurrent': 0., 'gain': 1, 'altname': ['APO'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2010SPIE.7735E..1CW'},
+    'BOSS': {'instrument_name': 'SDSS BOSS', 'pixelscale': 2./3.*u.arcsec, 'wave_range': [3700,10400]*u.Angstrom, 'slitwidth': 2.*u.arcsec, 'resolution': 2000, 'norders': 1, 'readnoise': 0, 'darkcurrent': 0., 'gain': 1, 'altname': ['SDSS','BOSS','EBOSS'], 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom, 'bibcode': '2013AJ....146...32S'},
+    'DEIMOS': {'instrument_name': 'Keck DEIMOS', 'pixelscale': 0.1185*u.arcsec, 'wave_range': [5000,9700]*u.Angstrom, 'slitwidth': 1.*u.arcsec, 'disperser': '600 l/mm', 'resolution': 2000, 'norders': 1, 'readnoise': 2.5, 'darkcurrent': 0., 'gain': 1.2, 'altname': ['DEIMOS'], 'bibcode': '2003spie.4841.1657F', 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom},
+    'FIRE': {'instrument_name': 'Magellan FIRE', 'pixelscale': 0.18*u.arcsec, 'wave_range': [0.82,2.51]*u.micron, 'slitwidth': 0.6*u.arcsec, 'resolution': 6000, 'norders': 21, 'readnoise': 0, 'darkcurrent': 0., 'gain': 1, 'altname': ['FIRE'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2013PASP..125..270S'},
+    'IRS-SL': {'instrument_name': 'Spitzer IRS Short-Low', 'pixelscale': 1.8*u.arcsec, 'wave_range': [5.2,14.5]*u.micron, 'slitwidth': 1.8*u.arcsec, 'resolution': 100, 'norders': 1, 'readnoise': 30., 'darkcurrent': 10., 'gain': 4.6, 'altname': ['IRS','IRS Short Low'], 'wunit': u.micron, 'funit': u.Jy, 'bibcode': '2004ApJS..154...18H'},
+    'IRS-LL': {'instrument_name': 'Spitzer IRS Short-Low', 'pixelscale': 5.1*u.arcsec, 'wave_range': [14,38.]*u.micron, 'slitwidth': 5.1*u.arcsec, 'resolution': 90, 'norders': 1, 'readnoise': 30., 'darkcurrent': 40., 'gain': 4.6, 'altname': ['IRS Long Low'], 'wunit': u.micron, 'funit': u.Jy, 'bibcode': '2004ApJS..154...18H'},
     'KAST-RED': {'instrument_name': 'Lick KAST Red Channel', 'pixelscale': 0.43*u.arcsec, 'disperser': '600/7500', 'wave_range': [5700,9200]*u.Angstrom, 'slitwidth': 2.*u.arcsec, 'resolution': 1200, 'norders': 1, 'readnoise': 3.8, 'darkcurrent': 0., 'gain': 1.9, 'altname': ['KAST','KAST-R'], 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom},
     'KAST-BLUE': {'instrument_name': 'Lick KAST Blue Channel', 'pixelscale': 0.43*u.arcsec, 'disperser': '600/4310', 'wave_range': [3300,5520]*u.Angstrom, 'slitwidth': 2.*u.arcsec, 'resolution': 950, 'norders': 1, 'readnoise': 3.7, 'darkcurrent': 0., 'gain': 1.2, 'altname': ['KAST-B'], 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom},
-    'LDSS-3': {'instrument_name': 'Magellan LDSS-3', 'pixelscale': 0.189*u.arcsec, 'disperser': 'VPH-RED', 'wave_range': [6000,10000]*u.Angstrom, 'slitwidth': 0.75*u.arcsec, 'resolution': 1810, 'norders': 1, 'readnoise': 4.07, 'darkcurrent': 0., 'gain': 1, 'altname': ['LDSS3'], 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom},
-    'LRIS-RED': {'altname': ['LRIS','LRISR'], 'instrument_name': 'Keck LRIS red channel longslit', 'instrument_reference': '1995PASP..107..375O', 'pixelscale': 0.135*u.arcsec, 'readnoise': 4.6, 'darkcurrent': 0., 'gain': 1.2, 'disperser': '400/8500', 'wave_range': [6300,10100]*u.Angstrom, 'slitwidth': 1.*u.arcsec, 'resolution': 1200, 'norders': 1, 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom},
-    'LRIS-BLUE': {'altname': ['LRISB'], 'instrument_name': 'Keck LRIS blue channel longslit', 'instrument_reference': '1998SPIE.3355...81M', 'pixelscale': 0.135*u.arcsec, 'readnoise': 4., 'darkcurrent': 0., 'gain': 1.6, 'disperser': '400/3400', 'wave_range': [1270,5740]*u.Angstrom, 'slitwidth': 1.*u.arcsec, 'resolution': 530, 'norders': 1, 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom},
-    'MAGE': {'instrument_name': 'Magellan MAGE', 'pixelscale': 0.3*u.arcsec, 'wave_range': [3100,10000]*u.Angstrom, 'slitwidth': 1.*u.arcsec, 'resolution': 4100, 'norders': 13, 'readnoise': 2.9, 'darkcurrent': 1.0, 'gain': 1.02, 'altname': ['MagE'], 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom},
-    'NIRI-J': {'instrument_name': 'Gemini NIRI J-band (G5202)', 'pixelscale': 0.47/4.*u.arcsec, 'wave_range': [1.05,1.41]*u.micron, 'slitwidth': 0.47*u.arcsec, 'resolution': 610, 'norders': 1, 'readnoise': 13., 'darkcurrent': 0.25, 'gain': 12.3, 'altname': ['NIRI','NIRI G5202'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'NIRI-H': {'instrument_name': 'Gemini NIRI J-band (G5203)', 'pixelscale': 0.47/4.*u.arcsec, 'wave_range': [1.43,1.96]*u.micron, 'slitwidth': 0.47*u.arcsec, 'resolution': 825, 'norders': 1, 'readnoise': 13., 'darkcurrent': 0.25, 'gain': 12.3, 'altname': ['NIRI G5203'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'NIRI-K': {'instrument_name': 'Gemini NIRI J-band (G5204)', 'pixelscale': 0.47/4.*u.arcsec, 'wave_range': [1.90,2.49]*u.micron, 'slitwidth': 0.47*u.arcsec, 'resolution': 780, 'norders': 1, 'readnoise': 13., 'darkcurrent': 0.25, 'gain': 12.3, 'altname': ['NIRI G5204'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'NIRI-L': {'instrument_name': 'Gemini NIRI J-band (G5205)', 'pixelscale': 0.47/4.*u.arcsec, 'wave_range': [2.99,4.15]*u.micron, 'slitwidth': 0.47*u.arcsec, 'resolution': 690, 'norders': 1, 'readnoise': 50., 'darkcurrent': 0.25, 'gain': 12.3, 'altname': ['NIRI G5205'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'NIRSPEC': {'instrument_name': 'Keck NIRSPEC', 'pixelscale': 0.43/3.*u.arcsec, 'wave_range': [0.95,5.5]*u.micron, 'slitwidth': 0.43*u.arcsec, 'resolution': 25000, 'norders': 8, 'readnoise': 23., 'darkcurrent': 0.8, 'gain': 5.8, 'altname': ['NIRSPAO'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'SPEX-PRISM': {'instrument_name': 'IRTF SpeX prism', 'pixelscale': 0.15*u.arcsec, 'wave_range': [0.7,2.5]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 200, 'norders': 1, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': ['SPEX','PRISM'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'SPEX-SXD': {'instrument_name': 'IRTF SpeX SXD', 'pixelscale': 0.15*u.arcsec, 'wave_range': [0.8,2.5]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 2000, 'norders': 7, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': ['SXD'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'SPEX-LXD1.9': {'instrument_name': 'IRTF SpeX LXD 1.9 micron', 'pixelscale': 0.15*u.arcsec, 'wave_range': [1.95,4.2]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 2500, 'norders': 7, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': ['SPEX LXD','LXD'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'SPEX-LXD2.1': {'instrument_name': 'IRTF SpeX LXD 2.1 micron', 'pixelscale': 0.15*u.arcsec, 'wave_range': [2.15,5.0]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 2500, 'norders': 7, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': [], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
-    'SPEX-LXD2.3': {'instrument_name': 'IRTF SpeX LXD 2.3 micron', 'pixelscale': 0.15*u.arcsec, 'wave_range': [2.25,5.5]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 2500, 'norders': 7, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': [], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
+    'LDSS-3': {'instrument_name': 'Magellan LDSS-3', 'pixelscale': 0.189*u.arcsec, 'disperser': 'VPH-RED', 'wave_range': [6000,10000]*u.Angstrom, 'slitwidth': 0.75*u.arcsec, 'resolution': 1810, 'norders': 1, 'readnoise': 4.07, 'darkcurrent': 0., 'gain': 1, 'altname': ['LDSS3'], 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom, 'bibcode': '1994PASP..106..983A'},
+    'LRIS-RED': {'altname': ['LRIS','LRISR'], 'instrument_name': 'Keck LRIS red channel longslit', 'bibcode': '1995PASP..107..375O', 'pixelscale': 0.135*u.arcsec, 'readnoise': 4.6, 'darkcurrent': 0., 'gain': 1.2, 'disperser': '400/8500', 'wave_range': [6300,10100]*u.Angstrom, 'slitwidth': 1.*u.arcsec, 'resolution': 1200, 'norders': 1, 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom, 'bibcode': '1995PASP..107..375O'},
+    'LRIS-BLUE': {'altname': ['LRISB'], 'instrument_name': 'Keck LRIS blue channel longslit', 'bibcode': '1998SPIE.3355...81M', 'pixelscale': 0.135*u.arcsec, 'readnoise': 4., 'darkcurrent': 0., 'gain': 1.6, 'disperser': '400/3400', 'wave_range': [1270,5740]*u.Angstrom, 'slitwidth': 1.*u.arcsec, 'resolution': 530, 'norders': 1, 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom, 'bibcode': '1995PASP..107..375O'},
+    'MAGE': {'instrument_name': 'Magellan MAGE', 'pixelscale': 0.3*u.arcsec, 'wave_range': [3100,10000]*u.Angstrom, 'slitwidth': 1.*u.arcsec, 'resolution': 4100, 'norders': 13, 'readnoise': 2.9, 'darkcurrent': 1.0, 'gain': 1.02, 'altname': ['MagE'], 'wunit': u.Angstrom, 'funit': u.erg/u.s/u.cm/u.cm/u.Angstrom, 'bibcode': '2008SPIE.7014E..54M'},
+    'NIRI-J': {'instrument_name': 'Gemini NIRI J-band (G5202)', 'pixelscale': 0.47/4.*u.arcsec, 'wave_range': [1.05,1.41]*u.micron, 'slitwidth': 0.47*u.arcsec, 'resolution': 610, 'norders': 1, 'readnoise': 13., 'darkcurrent': 0.25, 'gain': 12.3, 'altname': ['NIRI','NIRI G5202'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2003PASP..115.1388H'},
+    'NIRI-H': {'instrument_name': 'Gemini NIRI J-band (G5203)', 'pixelscale': 0.47/4.*u.arcsec, 'wave_range': [1.43,1.96]*u.micron, 'slitwidth': 0.47*u.arcsec, 'resolution': 825, 'norders': 1, 'readnoise': 13., 'darkcurrent': 0.25, 'gain': 12.3, 'altname': ['NIRI G5203'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2003PASP..115.1388H'},
+    'NIRI-K': {'instrument_name': 'Gemini NIRI J-band (G5204)', 'pixelscale': 0.47/4.*u.arcsec, 'wave_range': [1.90,2.49]*u.micron, 'slitwidth': 0.47*u.arcsec, 'resolution': 780, 'norders': 1, 'readnoise': 13., 'darkcurrent': 0.25, 'gain': 12.3, 'altname': ['NIRI G5204'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2003PASP..115.1388H'},
+    'NIRI-L': {'instrument_name': 'Gemini NIRI J-band (G5205)', 'pixelscale': 0.47/4.*u.arcsec, 'wave_range': [2.99,4.15]*u.micron, 'slitwidth': 0.47*u.arcsec, 'resolution': 690, 'norders': 1, 'readnoise': 50., 'darkcurrent': 0.25, 'gain': 12.3, 'altname': ['NIRI G5205'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2003PASP..115.1388H'},
+    'NIRSPEC': {'instrument_name': 'Keck NIRSPEC', 'pixelscale': 0.43/3.*u.arcsec, 'wave_range': [0.95,5.5]*u.micron, 'slitwidth': 0.43*u.arcsec, 'resolution': 25000, 'norders': 8, 'readnoise': 23., 'darkcurrent': 0.8, 'gain': 5.8, 'altname': ['NIRSPAO'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2000SPIE.4008.1048M'},
+    'SPEX-PRISM': {'instrument_name': 'IRTF SpeX prism', 'pixelscale': 0.15*u.arcsec, 'wave_range': [0.7,2.5]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 200, 'norders': 1, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': ['SPEX','PRISM'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2003PASP..115..362R'},
+    'SPEX-SXD': {'instrument_name': 'IRTF SpeX SXD', 'pixelscale': 0.15*u.arcsec, 'wave_range': [0.8,2.5]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 2000, 'norders': 7, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': ['SXD'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2003PASP..115..362R'},
+    'SPEX-LXD1.9': {'instrument_name': 'IRTF SpeX LXD 1.9 micron', 'pixelscale': 0.15*u.arcsec, 'wave_range': [1.95,4.2]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 2500, 'norders': 7, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': ['SPEX LXD','LXD'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2003PASP..115..362R'},
+    'SPEX-LXD2.1': {'instrument_name': 'IRTF SpeX LXD 2.1 micron', 'pixelscale': 0.15*u.arcsec, 'wave_range': [2.15,5.0]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 2500, 'norders': 7, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': [], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2003PASP..115..362R'},
+    'SPEX-LXD2.3': {'instrument_name': 'IRTF SpeX LXD 2.3 micron', 'pixelscale': 0.15*u.arcsec, 'wave_range': [2.25,5.5]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 2500, 'norders': 7, 'readnoise': 12, 'darkcurrent': 0.2, 'gain': 12, 'altname': [], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron, 'bibcode': '2003PASP..115..362R'},
 #	'USPEX': {'instrument_name': 'Updated SpeX prism', 'pixelscale': 0.10*u.arcsec, 'wave_range': [0.7,2.5]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 200, 'norders': 1, 'readnoise': 5, 'darkcurrent': 0.05, 'gain': 1.5, 'altname': ['']},
 #	'USPEX_PRISM': {'instrument_name': 'IRTF Updated SpeX prism', 'pixelscale': 0.10*u.arcsec, 'wave_range': [0.7,2.5]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 200, 'norders': 1, 'readnoise': 5, 'darkcurrent': 0.05, 'gain': 1.5, 'altname': ['USPEX','UPRISM'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
 #    'USPEX_SXD': {'instrument_name': 'IRTF Updated SpeX SXD', 'pixelscale': 0.10*u.arcsec, 'wave_range': [0.7,2.55]*u.micron, 'slitwidth': 0.3*u.arcsec, 'resolution': 2000, 'norders': 7, 'readnoise': 5, 'darkcurrent': 0.05, 'gain': 1.5, 'altname': ['USXD'], 'wunit': u.micron, 'funit': u.erg/u.s/u.cm/u.cm/u.micron},
@@ -559,10 +587,13 @@ SPECTRAL_MODEL_PARAMETERS = {\
 
 # evolutionary model information
 EVOLUTIONARY_MODELS = {\
-    'baraffe03': {'name': 'Barraffe 2003','citation': 'Baraffe et al. (2003)', 'bibcode': '2003A&A...402..701B', 'altname': ['bar03','baraffe2003']},\
-    'baraffe15': {'name': 'Barraffe 2015','citation': 'Baraffe et al. (2015)', 'bibcode': '2015A&A...577A..42B', 'altname': ['baraffe','bar15','baraffe2015']},\
-    'burrows01': {'name': 'Burrows 2001','citation': 'Burrows et al. (2001)', 'bibcode': '2015A&A...577A..42B', 'altname': ['burrows','bur01','burrows2001']},\
-    'saumon08': {'name': 'Saumon 2008','citation': 'Saumon et al. (2008)', 'bibcode': '2015A&A...577A..42B', 'altname': ['saumon','sau08','saumon2008']}}
+    'baraffe1997': {'name': 'baraffe1997','citation': 'Baraffe et al. (1997)', 'bibcode': '1997A&A...327.1054B', 'altname': ['bar97','baraffe97'], 'default': {'metallicity': 0.}},\
+    'baraffe1998': {'name': 'baraffe1998','citation': 'Baraffe et al. (1998)', 'bibcode': '1998A&A...337..403B', 'altname': ['bar98','baraffe98'], 'default': {'metallicity': 0., 'y': 0.275, 'l_mix': 1.}},\
+    'baraffe2003': {'name': 'baraffe2003','citation': 'Baraffe et al. (2003)', 'bibcode': '2003A&A...402..701B', 'altname': ['bar03','baraffe03'], 'default': {}},\
+    'baraffe2015': {'name': 'baraffe2015','citation': 'Baraffe et al. (2015)', 'bibcode': '2015A&A...577A..42B', 'altname': ['baraffe','bar15','baraffe15'], 'default': {}},\
+    'burrows2001': {'name': 'burrows2001','citation': 'Burrows et al. (2001)', 'bibcode': '2001RvMP...73..719B', 'altname': ['burrows','bur01','burrows01'], 'default': {}},\
+    'chabrier1997': {'name': 'chabrier1997','citation': 'Chabrier & Baraffe (1997)', 'bibcode': '1997A&A...328...83C', 'altname': ['chabrier','cha97','chabrier97'], 'default': {'metallicity': 0., 'y': 0.275}},\
+    'saumon2008': {'name': 'saumon2008','citation': 'Saumon et al. (2008)', 'bibcode': '2008ApJ...689.1327S', 'altname': ['saumon','sau08','saumon08']}, 'default': {'metallicity': 0., 'cloud': 'hybrid'}}
 
 EVOLUTIONARY_MODEL_PARAMETERS = {\
     'mass': {'unit': u.solMass, 'default': 0.05, 'title': '$M$'},\
@@ -572,18 +603,8 @@ EVOLUTIONARY_MODEL_PARAMETERS = {\
     'luminosity': {'unit': u.dex(u.solLum), 'default': -5., 'title': '$\log{L_{bol}/L_{\odot}}$'},\
     'radius': {'unit': u.solRad, 'default': 0.1, 'title': '$R_{\odot}$'}}
 
-SPT_COLORS_SETS = {
-    'skrzypek2015': {'altname': ['skrzypek','skrzypek15'], 'reference': 'Skrzypek et al. (2015)','bibcode': '2015A%26A...574A..78S','range': [15,38],'filters': ['i','z','y','j','h','k','w1','w2'],'scatter': 0.07,
-        'values': { 
-            'i-z': [0.91,1.45,1.77,1.93,1.99,2.01,2.02,2.04,2.1,2.2,2.33,2.51,2.71,2.93,3.15,3.36,3.55,3.7,3.82,3.9,3.95,3.98,4.01,4.08], \
-            'z-y': [0.47,0.6,0.7,0.77,0.82,0.86,0.88,0.9,0.92,0.94,0.97,1.0,1.04,1.09,1.16,1.23,1.33,1.43,1.55,1.68,1.81,1.96,2.11,2.26], \
-            'y-j': [0.55,0.67,0.78,0.87,0.96,1.04,1.11,1.18,1.23,1.27,1.31,1.33,1.35,1.21,1.2,1.19,1.19,1.18,1.18,1.17,1.16,1.16,1.15,1.15], \
-            'j-h': [0.45,0.53,0.56,0.58,0.6,0.63,0.67,0.73,0.79,0.86,0.91,0.96,0.97,0.96,0.9,0.8,0.65,0.46,0.25,0.02,-0.19,-0.35,-0.43,-0.36], \
-            'h-k': [0.32,0.39,0.44,0.47,0.51,0.54,0.58,0.63,0.67,0.71,0.74,0.75,0.75,0.71,0.65,0.56,0.45,0.31,0.16,0.01,-0.11,-0.19,-0.2,-0.09], \
-            'k-w1': [0.11,0.22,0.25,0.26,0.27,0.29,0.33,0.4,0.48,0.56,0.65,0.72,0.77,0.79,0.79,0.76,0.71,0.65,0.59,0.55,0.54,0.59,0.7,0.9], \
-            'w1-w2': [0.17,0.21,0.24,0.26,0.27,0.27,0.28,0.28,0.29,0.3,0.32,0.36,0.41,0.48,0.57,0.68,0.82,0.99,1.19,1.43,1.7,2.02,2.38,2.79]}
-        }
-    }
+
+# Empirical relation contants
 
 INDICES_SETS = {
     'allers': {'bibcode': '2013ApJ...772...79A'},
@@ -598,7 +619,39 @@ INDICES_SETS = {
     'tokunaga': {'bibcode': '1999AJ....117.1010T'},
 }    
 
-SPT_BC_SETS = {
+
+SPT_TEFF_RELATIONS = {
+    'golimowski': {'altname': ['golimowski04','golimowski2004','gol04'], 'reference': 'Golimowski et al. (2004)','bibcode': '2004AJ....127.3516G','sptoffset': 10.,'coeff': [9.5373e-4,-9.8598e-2,4.0323,-8.3099e1,9.0951e2,-5.1287e3,1.4322e4],'range': [16.,38.],'fitunc': 124.},
+    'looper': {'altname': ['looper08','looper2008','lop08'], 'reference': 'Looper et al. (2008)','bibcode': '2008ApJ...685.1183L','sptoffset': 20.,'coeff': [9.084e-4,-4.255e-2,6.414e-1,-3.101,1.950,-108.094,2319.92],'range': [20.,38.],'fitunc': 87.},
+    'stephens': {'altname': ['stephens09','stephens2009','ste09'], 'reference': 'Stephens et al. (2009)','bibcode': '2009ApJ...702..154S','sptoffset': 10.,'coeff': [-0.0025492,0.17667,-4.4727,54.67,-467.26,4400.],'range': [16.,38.],'fitunc': 100.},
+    'stephens-alt': {'altname': ['stephens09-alt','stephens2009-alt','ste09alt'], 'reference': 'Stephens et al. (2009)','bibcode': '2009ApJ...702..154S','sptoffset': 10.,'coeff': [-0.011997,1.2315,-50.472,1031.9,-10560.,44898.],'range': [23.,38.],'fitunc': 100.},
+    'marocco': {'altname': ['marocco13','marocco2013','mar13'], 'reference': 'Marocco et al. (2013)','bibcode': '2013AJ....146..161M','sptoffset': 10.,'coeff': [7.4211e-5,-8.43736e-3,3.90319e-1,-9.46896,129.141,-975.953,3561.47,-1613.82],'range': [17.,38.],'fitunc': 140.},
+    'filippazzo': {'altname': ['filippazzo15','filippazzo2015','fil15'], 'reference': 'Filippazzo et al. (2015)','bibcode': '2015ApJ...810..158F','sptoffset': 10.,'coeff': [1.546e-4, -1.606e-2, 6.318e-1, -1.191e1, 1.155e2, -7.005e2, 4.747e3], 'range': [16.,39.],'fitunc': 113.},
+    'faherty': {'altname': ['faherty16','faherty2016','fah16'], 'reference': 'Faherty et al. (2016)','bibcode': '2016ApJS..225...10F','sptoffset': 10.,'coeff': [1.546e-4,-1.606e-2,6.318e-1,-1.191e1,1.155e2,-7.005e2,4.747e3], 'range': [17.,38.],'fitunc': 113.},
+    'faherty-young': {'altname': ['faherty16-young','faherty2016-young','fah16yng'], 'reference': 'Faherty et al. (2016)','bibcode': '2016ApJS..225...10F','sptoffset': 10.,'coeff': [1.330,-6.68637e1,1.23542e3,-1.00688e4,3.27664e4], 'range': [17.,27.],'fitunc': 180.},
+    'faherty-young2': {'altname': ['faherty16-young2','faherty2016-young2','fah16yng2'], 'reference': 'Faherty et al. (2016)','bibcode': '2016ApJS..225...10F','sptoffset': 10.,'coeff': [9.106e-4,-1.016e-1,4.578,-1.066e2,1.360e3,-9.183e3,2.795e4], 'range': [17.,27.],'fitunc': 198.},
+    'faherty-group': {'altname': ['faherty16-group','faherty2016-group','fah16grp'], 'reference': 'Faherty et al. (2016)','bibcode': '2016ApJS..225...10F','sptoffset': 10.,'coeff': [7.383e0,-3.44522e2,4.87986e3], 'range': [17.,27.],'fitunc': 172.},
+    'dupuy-saumon': {'altname': ['dupuy','dupuy17','dupuy2017','dup17','dupuy17-saumon','dupuy2017-saumon','dup17-saumon'], 'reference': 'Dupuy et al. (2017)','bibcode': '','sptoffset': 10.,'coeff': [6.001,-284.52,4544.3], 'range': [21.5,35.],'fitunc': 80.},
+    'dupuy-lyon': {'altname': ['dupuy17-lyon','dupuy2017-lyon','dup17-lyon'], 'reference': 'Dupuy et al. (2017)','bibcode': '','sptoffset': 10.,'coeff': [4.582,-238.03,4251.0], 'range': [17.,35.],'fitunc': 90.},
+    'gonzales2018': {'altname': ['gonzales','gonzales18','gonzalez2018','gonzalez18','gonzalez','gon18','subdwarf'],'reference': 'Gonzales et al. (2018)','bibcode': 'TBD', 'sptoffset': 10., 'fitunc': 108, 'range' : [17., 27.], 'coeff': [-117,3721.]},
+}
+
+
+SPT_COLORS_RELATIONS = {
+    'skrzypek2015': {'altname': ['skrzypek','skrzypek15'], 'reference': 'Skrzypek et al. (2015)','bibcode': '2015A%26A...574A..78S','range': [15,38],'filters': ['i','z','y','j','h','k','w1','w2'],'scatter': 0.07,
+        'values': { 
+            'i-z': [0.91,1.45,1.77,1.93,1.99,2.01,2.02,2.04,2.1,2.2,2.33,2.51,2.71,2.93,3.15,3.36,3.55,3.7,3.82,3.9,3.95,3.98,4.01,4.08], \
+            'z-y': [0.47,0.6,0.7,0.77,0.82,0.86,0.88,0.9,0.92,0.94,0.97,1.0,1.04,1.09,1.16,1.23,1.33,1.43,1.55,1.68,1.81,1.96,2.11,2.26], \
+            'y-j': [0.55,0.67,0.78,0.87,0.96,1.04,1.11,1.18,1.23,1.27,1.31,1.33,1.35,1.21,1.2,1.19,1.19,1.18,1.18,1.17,1.16,1.16,1.15,1.15], \
+            'j-h': [0.45,0.53,0.56,0.58,0.6,0.63,0.67,0.73,0.79,0.86,0.91,0.96,0.97,0.96,0.9,0.8,0.65,0.46,0.25,0.02,-0.19,-0.35,-0.43,-0.36], \
+            'h-k': [0.32,0.39,0.44,0.47,0.51,0.54,0.58,0.63,0.67,0.71,0.74,0.75,0.75,0.71,0.65,0.56,0.45,0.31,0.16,0.01,-0.11,-0.19,-0.2,-0.09], \
+            'k-w1': [0.11,0.22,0.25,0.26,0.27,0.29,0.33,0.4,0.48,0.56,0.65,0.72,0.77,0.79,0.79,0.76,0.71,0.65,0.59,0.55,0.54,0.59,0.7,0.9], \
+            'w1-w2': [0.17,0.21,0.24,0.26,0.27,0.27,0.28,0.28,0.29,0.3,0.32,0.36,0.41,0.48,0.57,0.68,0.82,0.99,1.19,1.43,1.7,2.02,2.38,2.79]}
+        }
+    }
+
+
+SPT_BC_RELATIONS = {
     'liu2010': {'altname': ['liu10','liu'], 'bibcode': '2010ApJ...722..311L', 'sptoffset': 10, 'method': 'polynomial', 'filters': {
         'MKO_J': {'fitunc' : 0.14, 'range' : [16,38.5], 'coeff': [1.462266e-6,-1.558986e-4,6.540717e-3,-1.367605e-1,1.491738e0,-8.053993e0,1.890448e1]},
         'MKO_H': {'fitunc' : 0.07, 'range' : [16,38.5], 'coeff': [1.148133e-6,-1.171595e-4,4.733874e-3,-9.618535e-2,1.027185e0,-5.426683e0,1.366709e1]},
@@ -615,11 +668,12 @@ SPT_BC_SETS = {
         '2MASS_KS': {'fitunc' : 0.126, 'range' : [17,38], 'coeff': [2.742e-6,-2.633e-4,9.711e-3,-1.759e-1,1.565e0,-2.174e0]}}},
         }
 
-SPT_LBOL_SETS = {
+SPT_LBOL_RELATIONS = {
     'filippazzo2015': {'altname': ['filippazzo','filippazzo15','fillippazzo','filipazo','filippazo'], 'bibcode': '2015ApJ...810..158F', 'sptoffset': 10., 'method': 'polynomial', 'fitunc' : 0.133, 'range' : [16,39], 'coeff': [2.736e-7,-3.220e-5,1.449e-3,-3.207e-2,3.727e-1,-2.310e0,2.787e0]},
+    'gonzales2018': {'altname': ['gonzales','gonzales18','gonzalez2018','gonzalez18','gonzalez','gon18','subdwarf'],'bibcode': 'TBD', 'sptoffset': 10., 'method': 'polynomial', 'fitunc': 0.144, 'range' : [17., 27.], 'coeff': [-0.125,-2.10]},
         }
 
-ABSMAG_LBOL_SETS = {
+ABSMAG_LBOL_RELATIONS = {
     'dupuy2017': {'altname': ['dupuy17','dupuy'], 'bibcode': '2017ApJS..231...15D',  'method': 'polynomial', 'filters': {
         'MKO_H': {'fitunc' : 0.023, 'range' : [9.6,13.3], 'coeff': [1.06200e-2,-3.51721e-1,3.46876e1,-1.3282e1]},
         'MKO_K': {'fitunc' : 0.05, 'range' : [9.1,17.8], 'coeff': [4.54547e-4,-3.068824e-2,8.162709e-1,-1.0671188e1,6.811147e1,-1.72188e2]},
@@ -627,7 +681,7 @@ ABSMAG_LBOL_SETS = {
         '2MASS_KS': {'fitunc' : 0.05, 'range' : [8.8,16.6], 'coeff': [9.8821e-5,-7.85837e-3,2.357643e-1,-3.364101e0,2.258776e1,-5.9877e1]}}},
         }
 
-SPT_ABSMAG_SETS = {
+SPT_ABSMAG_RELATIONS = {
     'dahn2002': {'altname': ['dahn','dahn02'], 'bibcode': '2002AJ....124.1170D', 'sptoffset': 10, 'method': 'polynomial', 'filters': {
         '2MASS_J': {'fitunc' : 0.25, 'range' : [17.,28.], 'coeff': [0.341,8.38]}}},
     'cruz2003': {'altname': ['cruz','cruz03'], 'bibcode': '2003AJ....126.2421C', 'sptoffset': 10, 'method': 'polynomial', 'filters': {
@@ -742,6 +796,12 @@ SPT_ABSMAG_SETS = {
         '2MASS_KS': {'fitunc' : 0.36, 'range' : [20., 27.], 'coeff': [0.356,6.573]},
         'WISE_W1': {'fitunc' : 0.13, 'range' : [20., 27.], 'coeff': [0.237,7.436]},
         'WISE_W2': {'fitunc' : 0.18, 'range' : [20., 27.], 'coeff': [0.193,7.561]}}},
+    'gonzales2018': {'altname': ['gonzales','gonzales18','gonzalez2018','gonzalez18','gonzalez','gon18','subdwarf'],'bibcode': 'TBD', 'sptoffset': 10., 'method': 'polynomial', 'filters': {
+        '2MASS_J': {'fitunc' : 0.26, 'range' : [17., 27.], 'coeff': [0.263,8.49]},
+        '2MASS_H': {'fitunc' : 0.24, 'range' : [17., 27.], 'coeff': [0.304,7.77]},
+        '2MASS_KS': {'fitunc' : 0.21, 'range' : [17., 27.], 'coeff': [0.344,7.29]},
+        'WISE_W1': {'fitunc' : 0.27, 'range' : [17., 27.], 'coeff': [0.241,7.72]},
+        'WISE_W2': {'fitunc' : 0.24, 'range' : [17., 27.], 'coeff': [0.228,7.62]}}},
 }
 
 # telscope locations
@@ -749,14 +809,4 @@ TELESCOPES = {
     'KECK': {'lat': 19.8263*u.deg, 'lon': -155.4783*u.deg, 'height': 4160*u.m, 'altname': ['MAUNA_KEA','SUBARU','IRTF','CHFT','UKIRT','GEMINI_N','GEMINI_NORTH']},
     'VLT': {'lat': -24.6275*u.deg, 'lon': -70.4044*u.deg, 'height': 2636*u.m, 'altname': ['PARANAL','CERRO_PARANAL','VERY_LARGE_TELESCOPE','ESA']},
 }
-
-# more faherty2016 relations
-#Teff FLD 6.0<SpT <29.0 113.431 4.747e+03 -7.005e+02 1.155e+02 -1.191e+01 6.318e-01 -1.606e-02 1.546e-04
-#Teff YNG 7.0<SpT <17.0 180.457 1.330e+00 -66.8637 1235.42 -10068.8 32766.4 · · · · · ·
-#Teff YNG2 7.0<SpT <28.0 197.737 2.795e+04 -9.183e+03 1.360e+03 -1.066e+02 4.578e+00 -1.016e-01 9.106e-04
-#Teff GRP 7.0<SpT <17.0 172.215 7.383e+00 -344.522 4879.86 · · · · · · · · · · · ·
-#Lbol FLD 7.0<SpT <28.0 0.133 2.787e+00 -2.310e+00 3.727e-01 -3.207e-02 1.449e-03 -3.220e-05 2.736e-07
-#Lbol YNG 7.0<SpT <17.0 0.335 -6.514e-03 2.448e-01 -3.113e+00 9.492e+00 · · · · · · · · ·
-#Lbol YNG2 7.0<SpT <28.0 0.206 2.059e-01 9.585 -3.985 4.923e-01 -3.048e-02 9.134e-04 -1.056e-05
-#Lbol GRP 7.0<SpT <17.0 0.221 6.194e-03 -3.757e-01 2.728e-02 · · · · · · · · · · · ·
 

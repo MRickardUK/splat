@@ -41,6 +41,7 @@ import sys
 import warnings
 
 # imports - external
+import matplotlib; matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import numpy
 import pandas
@@ -88,6 +89,182 @@ warnings.simplefilter('ignore')
 
 # temporary constants - will be removed
 max_snr = 1.e6                # maximum S/N ratio permitted
+
+#######################################################
+#######################################################
+##################   DATA LOADING  ####################
+#######################################################
+#######################################################
+
+DB_ALL_SPECTRA = pandas.DataFrame()
+for k in (DB_SPECTRA_DEFAULT_PARAMETERS.keys()): DB_ALL_SPECTRA[k] = []
+
+def _processNewData(verbose=True,**kwargs):
+    pass
+
+def _initializeAllData(override=False,verbose=False,**kwargs):
+    '''
+    :Purpose:
+
+        Initializes the spectral data available for analysis by adding to splat.SPECTRAL_DATA global variable
+
+    :Required Inputs:
+
+        None
+
+    :Optional Inputs:
+
+        * :param verbose = False: provide verbose feedback
+
+    :Outputs:
+        
+        None
+
+    '''
+##### ISSUES #####
+# need to figure out how to properly read in quantities
+
+# default information for a new data set    
+    DATA_FOLDERS = []
+# structure:
+#   instrument name
+#       folder
+
+# folders from which data are to be found
+    mfolders = [SPLAT_PATH+DATA_FOLDER+'../']
+
+# as specified in .splat_spectral_data
+    if os.path.exists(EXTERNAL_DATA_FILE):
+        with open(EXTERNAL_DATA_FILE, 'r') as frd: x = frd.read()
+        mfolders.extend(x.split('\n'))
+    if os.path.exists(HOME_FOLDER+'/'+EXTERNAL_DATA_FILE):
+        with open(HOME_FOLDER+'/'+EXTERNAL_DATA_FILE, 'r') as frd: x = frd.read()
+        mfolders.extend(x.split('\n'))
+# specified in environmental variable SPLAT_DATA
+    if os.environ.get('SPLAT_DATA') != None:
+        mfolders.extend(str(os.environ['SPLAT_DATA']).split(':'))
+
+# check the folders
+    if '' in mfolders: mfolders.remove('')
+    rm = []
+    for m in mfolders:
+        if os.path.exists(m) == False: rm.append(m)
+    if len(rm) > 0:
+        for m in rm: mfolders.remove(m)
+    if len(mfolders) == 0:
+        if verbose == True: print('\nNo folders containing spectral data were found to be present')
+        return
+    mfolders = list(set(mfolders))
+
+# go through each folder and check for subfolders = instrument names
+    for i,f in enumerate(mfolders):
+        instruments = os.listdir(f)
+# only folders
+        rm = []
+        for m in instruments: 
+            if os.path.isdir(os.path.join(f,m))==False: rm.append(m)
+        if len(rm) > 0: 
+            for m in rm: instruments.remove(m)
+        if len(instruments) > 0:
+            for inst in instruments:
+                DATA_FOLDERS.append(os.path.join(f,inst))
+                instcheck = checkInstrument(inst)
+# new instrument; set defaults, then drew from kwargs or instrument definition file                
+                if instcheck == False:
+                    ikey = (inst.upper()).replace(' ','-').replace('_','-')
+                    idict = {}
+                    for k in list(INSTRUMENT_DEFAULT_PARAMETERS.keys()): idict[k] = kwargs.get(k,INSTRUMENT_DEFAULT_PARAMETERS[k]['default'])
+                    if INSTRUMENT_DEFINITION_FILE in os.listdir(DATA_FOLDERS[-1]):
+                        idict_read = readDictFromFile(os.path.join(DATA_FOLDERS[-1],INSTRUMENT_DEFINITION_FILE))
+                        for k in list(idict_read.keys()): idict[k] = idict_read[k]
+                    idict['altname'].append(inst)
+                    INSTRUMENTS[ikey] = idict
+                    if verbose == True:
+                        print('Instrument {} was not one of the SPLAT defaults; added as a new instrument with following parameters:'.format(inst))
+                        for k in list(idict.keys()): print('\t{} = {}'.format(k,idict[k]))
+                else: 
+                    inst = instcheck
+                    idict = INSTRUMENTS[inst]
+# save instrument information if not present
+                if INSTRUMENT_DEFINITION_FILE not in os.listdir(DATA_FOLDERS[-1]) or override == True:
+                    writeDictToFile(idict,os.path.join(DATA_FOLDERS[-1],INSTRUMENT_DEFINITION_FILE))
+
+# read in or generate spectral_data.txt file, and integrate into a "super" database
+        if len(DATA_FOLDERS) == 0:
+            if verbose == True: print('No data uploaded')
+            return
+
+# STOPPED HERE
+#         for i,inst in enumerate(list(SPLAT_DATA_INVENTORY.keys()))
+
+
+# # now go through all data folders and add data
+#                 fnm = os.path.join(f,nm)
+#                 instruments = os.listdir(fnm)
+#                 name = checkSpectralModelName(nm)
+# # new model name, add to global variable
+# # using info.txt data if available                    
+#                 if name == False:
+#                     name = nm
+#                     adddict = {'name': name}
+#                     definfo = copy.deepcopy(default_info)
+#                     if 'info.txt' in instruments:
+#                         with open(os.path.join(fnm,'info.txt'), 'r') as frd: x = frd.read()
+#                         lines = x.split('\n')
+#                         if '' in lines: lines.remove('')
+#                         lines = [x.split('\t') for x in lines]
+#                         adddict = dict(lines)
+#                         if 'altnames' in list(adddict.keys()): adddict['altnames'] = adddict['altnames'].split(',')
+#                    for k in list(SPECTRAL_MODELS[list(SPECTRAL_MODELS.keys())[0]].keys()):
+#                        if k not in list(adddict.keys()):
+#                            if k in list(default_info.keys()): adddict[k] = definfo[k]
+#                            else: adddict[k] = ''
+#                    for k in list(default_info.keys()):
+#                        if k not in list(minfo.keys()): minfo[k] = default_info[k]
+
+# #  this sets the default values - it would be better to just grab one file and set the defaults that way                    
+#                     if 'default' not in list(adddict.keys()): adddict['default'] = {}
+#                     for k in list(SPECTRAL_MODEL_PARAMETERS.keys()):
+#                         if k in list(adddict.keys()): adddict['default'][k] = adddict[k]
+#                         if 'default_'+k in list(adddict.keys()): adddict['default'][k] = adddict['default_'+k]
+# #                        if k in list(adddict['default'].keys()): print(k,adddict['default'][k])
+# #                    print('\nWarning: did not find info.txt file in {}; using default values for model information'.format(minfo['folder']))
+# #                    adddict['name'] = nm
+#                     if 'name' not in list(adddict.keys()): adddict['name'] = name
+#                     if 'instruments' not in list(adddict.keys()): adddict['instruments'] = {}
+#                     if 'bibcode' not in list(adddict.keys()): adddict['bibcode'] = ''
+#                     SPECTRAL_MODELS[name] = adddict
+#                     if verbose==True: print('\nAdded a new model {} with parameters {}'.format(name,adddict))
+#                     del adddict, definfo
+# # go through instruments                
+#                 rm = []
+#                 for m in instruments:
+#                     if os.path.isdir(os.path.join(fnm,m))==False: rm.append(m)
+#                 if len(rm) > 0:
+#                     for m in rm: instruments.remove(m)
+#                 if len(instruments) > 0:
+#                     for inst in instruments:
+# # make sure there are files in this folder
+#                         fnmi = os.path.join(fnm,inst)
+#                         mfiles = os.listdir(fnmi)
+#                         if len(mfiles) > 0:
+#                             instrument = checkInstrument(inst)
+# # unknown instrument; just add for now
+#                             if instrument == False:
+#                                 instrument = (inst.replace(' ','-').replace('_','-')).upper()
+#                             if instrument not in list(SPECTRAL_MODELS[name]['instruments'].keys()):
+#                                 SPECTRAL_MODELS[name]['instruments'][instrument] = fnmi
+#                                 if verbose == True: print('\nAdding model {} and instrument {} from {}'.format(name,instrument,fnmi))
+#                             else:
+#                                 if verbose == True: print('\nModel {} and instrument {}: ignoring {} as these already exists in {}'.format(name,instrument,fnmi,SPECTRAL_MODELS[name]['instruments'][instrument]))
+
+#     return
+    if verbose == True:
+        print('Imported spectral data folders:')
+        for d in DATA_FOLDERS: print('\t{}'.format(d))
+    pass
+
+_initializeAllData()
 
 
 #####################################################
@@ -1861,7 +2038,7 @@ class Spectrum(object):
 
         :Required Input:
 
-            :param mask: An array of booleans, ints or floats, where True or 1 means remove the element 
+            :param mask: An array of booleans, ints, or floats, where True or 1 means remove the element 
         
         :Optional Input:
 
@@ -1890,7 +2067,10 @@ class Spectrum(object):
         if not isinstance(msk[0],bool): print('\nWarning: cannot interpret mask {}; not removing any pixels'.format(mask))
 
 # invert mask
-        msk = [not x for x in msk]
+        msk = numpy.array([not x for x in msk])
+#        self.wave = (numpy.array(self.wave.value)[msk])*self.wave.unit
+#        self.flux = (numpy.array(self.flux.value)[msk])*self.flux.unit
+#        self.noise = (numpy.array(self.noise.value)[msk])*self.noise.unit
         self.wave = self.wave[msk]
         self.flux = self.flux[msk]
         self.noise = self.noise[msk]
@@ -2926,28 +3106,33 @@ def getStandard(spt, **kwargs):
         stds = STDS_ESD_SPEX
         kys = STDS_ESD_SPEX_KEYS
         subclass = 'esd'
+        stdtype = 'extreme subdwarf'
     elif kwargs.get('sd',False) or 'sd' in sptstr:
         stds = STDS_SD_SPEX
         kys = STDS_SD_SPEX_KEYS
         subclass = 'sd'
+        stdtype = 'subdwarf'
     elif kwargs.get('vlg',False) or 'gamma' in sptstr:
         stds = STDS_VLG_SPEX
         kys = STDS_VLG_SPEX_KEYS
-        subclass = ''
+        subclass = 'gamma'
+        stdtype = 'very low gravity dwarf'
     elif kwargs.get('intg',False) or 'beta' in sptstr:
         stds = STDS_INTG_SPEX
         kys = STDS_INTG_SPEX_KEYS
-        subclass = ''
+        subclass = 'beta'
+        stdtype = 'intermediate gravity dwarf'
     else:
         stds = STDS_DWARF_SPEX
         kys = STDS_DWARF_SPEX_KEYS
         subclass = ''
+        stdtype = 'dwarf'
 
     spt = typeToNum(spt,subclass=subclass)
 
 # not a valid subtype
     if spt not in list(kys.keys()):
-        print('Type {} is not in {} standards: try one of the following:'.format(spt,subclass))
+        print('Type {} is not in {} standards: try one of the following:'.format(spt,stdtype))
         print(sorted(list(kys.keys())))
         return Spectrum()
 
@@ -2957,6 +3142,9 @@ def getStandard(spt, **kwargs):
     
     return stds[spt]
 
+
+def initializeStandards(**kwargs):
+    return(initiateStandards())
 
 
 def initiateStandards(**kwargs):
@@ -3712,6 +3900,7 @@ def readSpectrum(verbose=False,*args,**kwargs):
     if inst != False: instrument = inst
 #    local = kwargs.get('local',True)
     online = False
+    dnldflag = False
 #    local = not online
     url = kwargs.get('url',SPLAT_URL+DATA_FOLDER)
 
@@ -3743,18 +3932,19 @@ def readSpectrum(verbose=False,*args,**kwargs):
 # second pass: download file if necessary
 #    online = not local
     if online == True:
-       if checkOnline(url+file) == '':
-           file = folder+os.path.basename(file)
-           if checkOnline(url+file) == '':
-               raise ValueError('\nCannot find file '+kwargs['filename']+' on SPLAT website\n\n')
+        if checkOnline(url+file) == '':
+            file = folder+os.path.basename(file)
+            if checkOnline(url+file) == '':
+                raise ValueError('\nCannot find file '+kwargs['filename']+' on SPLAT website\n\n')
 # read in online file
 #           file = kwargs['filename']
-       try:
-           if os.path.exists(os.path.normpath(os.path.basename(kwargs['filename']))):
-               os.remove(os.path.normpath(os.path.basename(kwargs['filename'])))
-           open(os.path.normpath(os.path.basename(kwargs['filename'])), 'wb').write(requests.get(url+file).content)
-       except:
-           raise NameError('\nProblem reading in {} from SPLAT website'.format(kwargs['filename']))
+        try:
+            if os.path.exists(os.path.normpath(os.path.basename(kwargs['filename']))):
+                os.remove(os.path.normpath(os.path.basename(kwargs['filename'])))
+            open(os.path.normpath(os.path.basename(kwargs['filename'])), 'wb').write(requests.get(url+file).content)
+            dnldflag = True
+        except:
+            raise NameError('\nProblem reading in {} from SPLAT website'.format(kwargs['filename']))
 
 # instrument specific reads
     if instrument.upper()=='APOGEE': output = _readAPOGEE(file,**kwargs)
@@ -3886,8 +4076,8 @@ def readSpectrum(verbose=False,*args,**kwargs):
         for k in list(INSTRUMENTS[inst].keys()): output[k] = INSTRUMENTS[inst][k]  
 
 # clean up
-#    if url != '' and not local:
-#        os.remove(os.path.basename(TMPFILENAME))
+    if online==True and dnldflag == True:
+        os.remove(os.path.normpath(os.path.basename(kwargs['filename'])))
     if 'wunit' not in list(output.keys()): output['wunit'] = kwargs.get('wunit',DEFAULT_WAVE_UNIT)
     if 'funit' not in list(output.keys()): output['funit'] = kwargs.get('funit',DEFAULT_FLUX_UNIT)
     return output

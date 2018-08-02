@@ -24,6 +24,7 @@ import astropy.constants as constants
 from astropy.cosmology import Planck15, z_at_value
 from astropy.io import ascii
 import pandas
+import matplotlib; matplotlib.use('agg')
 import matplotlib.pyplot as plt
 import numpy
 from scipy.interpolate import griddata, interp1d
@@ -159,7 +160,7 @@ def galactic_density_juric(rc,zc,rho0 = 1./(u.pc**3),report='total',center='sun'
     else: return rho
 
 
-def volumeCorrection(coordinate,dmax,model='juric',center='sun',nsamp=1000,unit=u.pc):
+def volumeCorrection(coordinate,dmax,dmin=0.,model='juric',center='sun',nsamp=1000,unit=u.pc):
     '''
     :Purpose: 
 
@@ -205,10 +206,14 @@ def volumeCorrection(coordinate,dmax,model='juric',center='sun',nsamp=1000,unit=
 # check inputs
     if not isUnit(unit): unit = u.pc
 
-    if not isinstance(coordinate,SkyCoord):
-        try: c = properCoordinates(cd)
-        except: raise ValueError('{} is not a proper coordinate'.format(coordinate))
-    else: c = coordinate
+    try:
+        c = splat.properCoordinates(coordinate)
+    except: 
+        raise ValueError('Input variable {} is not a proper coordinate or list of coordinates'.format(coordinate))
+    try:
+        x = len(c)
+    except:
+        c = [c]
 
     dmx = copy.deepcopy(dmax)
     if isUnit(dmx): dmx = dmx.to(unit).value
@@ -216,6 +221,12 @@ def volumeCorrection(coordinate,dmax,model='juric',center='sun',nsamp=1000,unit=
         try: dmx = float(dmx)
         except: raise ValueError('{} is not a proper distance value'.format(dmax))
     if dmx == 0.: return 1.
+
+    dmn = copy.deepcopy(dmin)
+    if isUnit(dmn): dmn = dmn.to(unit).value
+    if not isinstance(dmn,float): 
+        try: dmn = float(dmn)
+        except: raise ValueError('{} is not a proper distance value'.format(dmin))
 
 # galactic number density function
     if model.lower() == 'juric':
@@ -227,16 +238,21 @@ def volumeCorrection(coordinate,dmax,model='juric',center='sun',nsamp=1000,unit=
 
 # generate R,z vectors
 # single sight line & distance
-    d = numpy.linspace(0,dmx,nsamp)
-    x,y,z = xyz(c,distance=d,center=center,unit=unit)
-    r = (x**2+y**2)**0.5
-    rho = rho_function(r,z,rho0=1.,center=center,unit=unit)
+    d = numpy.linspace(dmn,dmx,nsamp)
+    rho = []
+    for crd in c:
+        x,y,z = splat.xyz(crd,distance=d,center=center,unit=unit)
+        r = (x**2+y**2)**0.5
+        rho.append(rho_function(r,z,rho0=1.,center=center,unit=unit))
 
-    return float(integrate.trapz(rho*(d**2),x=d)/integrate.trapz(d**2,x=d))
+    if len(rho) == 1:
+        return float(integrate.trapz(rho[0]*(d**2),x=d)/integrate.trapz(d**2,x=d))
+    else:
+        return [float(integrate.trapz(r*(d**2),x=d)/integrate.trapz(d**2,x=d)) for r in rho]
 
 
 
-def simulateAges(num,age_range=[0.1,10.],distribution='uniform',parameters={},sfh=False,verbose=False,**kwargs):
+def simulateAges(num,age_range=[0.1,10.],minage=0.1,maxage=10.,distribution='uniform',parameters={},sfh=False,nsamp=1000,verbose=False,**kwargs):
     '''
     :Purpose: 
 
@@ -294,10 +310,11 @@ def simulateAges(num,age_range=[0.1,10.],distribution='uniform',parameters={},sf
 # initial parameters
 #    distribution = kwargs.get('distribution','uniform')
     allowed_distributions = ['uniform','flat','exponential','double-exponential','peaked','cosmic','aumer','aumer-double','aumer-peaked','just','just_exponential','just-peaked','just-peaked-a','just-peaked-b','miller','rujopakarn']
-    mn = kwargs.get('minage',0.1)
-    mn = kwargs.get('min',mn)
-    mx = kwargs.get('maxage',10.)
-    mx = kwargs.get('max',mx)
+    for f in ['ref','reference','set','method','relation','model']:
+        if f in list(kwargs.keys()): distribution = kwargs.get(f,distribution)
+
+    mn = kwargs.get('min',minage)
+    mx = kwargs.get('max',maxage)
 #    sfh = kwargs.get('sfh',False)
     age_range = kwargs.get('age_range',[mn,mx])
     age_range = kwargs.get('range',age_range)
@@ -337,14 +354,14 @@ def simulateAges(num,age_range=[0.1,10.],distribution='uniform',parameters={},sf
 
 # use CDF sampling
         if parameters['beta'] != 0.:
-            x = numpy.linspace(numpy.min(age_range),numpy.max(age_range),num=10000)
+            x = numpy.linspace(numpy.min(age_range),numpy.max(age_range),num=int(nsamp))
             y = numpy.exp(parameters['beta']*x)
             y -= numpy.min(y)
             y /= numpy.max(y)
             f = interp1d(y,x)
-            ages = f(numpy.random.uniform(size=num))
+            ages = f(numpy.random.uniform(size=int(num)))
         else:
-            ages = numpy.random.uniform(numpy.min(age_range), numpy.max(age_range), size=num)
+            ages = numpy.random.uniform(numpy.min(age_range), numpy.max(age_range), size=int(num))
 
 # double exponential
     elif distribution.lower() == 'double_exponential' or distribution.lower() == 'aumer_double':
@@ -355,12 +372,12 @@ def simulateAges(num,age_range=[0.1,10.],distribution='uniform',parameters={},sf
             parameters['a'] = 1.e-8
 
 # use CDF sampling
-        x = numpy.linspace(numpy.min(age_range),numpy.max(age_range),num=10000)
+        x = numpy.linspace(numpy.min(age_range),numpy.max(age_range),num=int(nsamp))
         y = parameters['a']*numpy.exp(parameters['lambda']*x) + numpy.exp(parameters['beta']*x)
         y -= numpy.min(y)
         y /= numpy.max(y)
         f = interp1d(y,x)
-        ages = f(numpy.random.uniform(size=num))
+        ages = f(numpy.random.uniform(size=int(num)))
 
 # peaked distribution
     elif distribution.lower() == 'peaked' or distribution.lower() == 'just_peaked' or distribution.lower() == 'just_peaked_a' or distribution.lower() == 'just_peaked_b' or distribution.lower() == 'aumer_peaked':
@@ -382,7 +399,7 @@ def simulateAges(num,age_range=[0.1,10.],distribution='uniform',parameters={},sf
 
 # generate CDF by integration and then do CDF sampling
 # note that function is slightly different for the two forms
-        x = numpy.linspace(numpy.min(age_range),numpy.max(age_range),num=10000)
+        x = numpy.linspace(numpy.min(age_range),numpy.max(age_range),num=int(nsamp))
         if 'just' in distribution:
             y = (x+parameters['t0'])/((x**2+parameters['t1']**2)**2)
 #            print(2./3.*(t0**2+0.75*t1**2)**0.5 - 2./3.*t0)
@@ -393,7 +410,7 @@ def simulateAges(num,age_range=[0.1,10.],distribution='uniform',parameters={},sf
         yc -= numpy.min(yc)
         yc /= numpy.max(yc)
         f = interp1d(yc,x)
-        ages = f(numpy.random.uniform(size=num))
+        ages = f(numpy.random.uniform(size=int(num)))
 
 # cosmic star formation rate
     elif distribution.lower() == 'cosmic' or distribution.lower() == 'rujopakarn': 
@@ -404,18 +421,18 @@ def simulateAges(num,age_range=[0.1,10.],distribution='uniform',parameters={},sf
         cosmo = Planck15    # in case we want to change later
         zrng = [z_at_value(cosmo.lookback_time,numpy.min(age_range)*u.Gyr),z_at_value(cosmo.lookback_time,numpy.max(age_range)*u.Gyr)]
 # use CDF sampling
-        x = numpy.linspace(numpy.min(zrng),numpy.max(zrng),num=10000)
+        x = numpy.linspace(numpy.min(zrng),numpy.max(zrng),num=int(nsamp))
         y = (x+1.)**parameters['alpha']
         y -= numpy.min(y)
         y /= numpy.max(y)
         f = interp1d(y,x)
-        z = f(numpy.random.uniform(size=num))
+        z = f(numpy.random.uniform(size=int(num)))
         ages = cosmo.lookback_time(z)
 
 # uniform distribution (default)
     elif distribution.lower() == 'uniform' or distribution.lower() == 'flat': 
         if verbose: print('using uniform distribution')
-        ages = numpy.random.uniform(numpy.min(age_range), numpy.max(age_range), size=num)
+        ages = numpy.random.uniform(numpy.min(age_range), numpy.max(age_range), size=int(num))
 
     else:
         return ValueError('Did not recognize distribution {}'.format(distribution))
@@ -428,7 +445,7 @@ def simulateAges(num,age_range=[0.1,10.],distribution='uniform',parameters={},sf
 
 
 
-def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameters = {},verbose=False,**kwargs):
+def simulateMasses(num,mass_range = [0.01,0.1],minmass=0.01,maxmass=0.1,distribution='powerlaw',parameters = {},nsamp=1000,verbose=False,**kwargs):
     '''
     :Purpose: 
 
@@ -479,11 +496,13 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
 # initial parameters
 #    distribution = kwargs.get('distribution','powerlaw')
     allowed_distributions = ['uniform','flat','powerlaw','power-law','broken-powerlaw','broken-power-law','lognormal','log-normal','kroupa','chabrier','salpeter']
+    for f in ['ref','reference','set','method','relation','model']:
+        if f in list(kwargs.keys()): distribution = kwargs.get(f,distribution)
+
+    mn = kwargs.get('min',minmass)
+    mx = kwargs.get('max',maxmass)
+    mass_range = kwargs.get('mass_range',[minmass,maxmass])
     mass_range = kwargs.get('range',mass_range)
-    mn = kwargs.get('minmass',-1.)
-    mn = kwargs.get('min',mn)
-    mx = kwargs.get('maxmass',-1.)
-    mx = kwargs.get('max',mx)
 
 # protective offset
     if mass_range[0] == mass_range[1]:
@@ -508,7 +527,7 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
 # power-law - sample from CDF
     if distribution.lower() == 'power-law' or distribution.lower() == 'powerlaw' or distribution.lower() == 'salpeter':
         if distribution.lower() == 'salpeter': parameters['alpha'] = 2.35
-        x = numpy.linspace(numpy.min(mass_range),numpy.max(mass_range),num=10000)
+        x = numpy.linspace(numpy.min(mass_range),numpy.max(mass_range),num=int(nsamp))
         if parameters['alpha'] == 1.:
             y = numpy.log(x)
         else:
@@ -518,11 +537,11 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
         y = y/numpy.max(y)
         f = interp1d(y,x)
 #        plt.plot(x,y)
-        masses = f(numpy.random.uniform(size=num))
+        masses = f(numpy.random.uniform(size=int(num)))
 
 # lognormal - this doesn't quite work?
     elif distribution.lower() == 'lognormal' or distribution.lower() == 'log-normal':
-        masses = numpy.random.lognormal(parameters['log-mu'], parameters['log-sigma'], num)
+        masses = numpy.random.lognormal(parameters['log-mu'], parameters['log-sigma'], int(num))
 
 
 # broken power law
@@ -544,7 +563,7 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
         for i,mb in enumerate(mbs):
             if mlow < mb and mlow < numpy.max(mass_range):
 #                print(mb,mlow,numpy.min([mb,numpy.max(mass_range)]))
-                x = numpy.linspace(mlow,numpy.min([mb,numpy.max(mass_range)]),num=10000)
+                x = numpy.linspace(mlow,numpy.min([mb,numpy.max(mass_range)]),num=int(nsamp))
                 y = x**(-1.*alphas[i])
                 if len(yfull) > 0: y *= yfull[-1]/y[0]
                 yfull.extend(y)
@@ -553,7 +572,7 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
 # last mass range                
         if mlow < numpy.max(mass_range):
 #            print(mlow,numpy.max(mass_range))
-            x = numpy.linspace(mlow,numpy.max(mass_range),num=10000)
+            x = numpy.linspace(mlow,numpy.max(mass_range),num=int(nsamp))
             y = x**(-1.*alphas[-1])
             if len(yfull) > 0: y *= yfull[-1]/y[0]
             yfull.extend(y)
@@ -561,7 +580,7 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
 #        plt.loglog(xfull,[a+10 for a in yfull])
 #        plt.ylim([7,10])
 #        plt.show()
-        xf = numpy.linspace(mass_range[0],mass_range[1],num=10000)
+        xf = numpy.linspace(mass_range[0],mass_range[1],num=int(nsamp))
         f = interp1d(xfull,yfull)
         yf = f(xf)
         yf = yf-numpy.min(yf)
@@ -572,7 +591,7 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
 #        plt.ylim([7,10])
 #        plt.show()
         f = interp1d(yc,xf)
-        masses = f(numpy.random.uniform(size=num))
+        masses = f(numpy.random.uniform(size=int(num)))
 
 # Chabrier (2003) distribution
     elif 'chabrier' in distribution.lower():
@@ -580,7 +599,7 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
         yfull = []
         xfull = []
         if numpy.min(mass_range) < 1.0:
-            xfull = numpy.linspace(numpy.min(mass_range),numpy.min([numpy.max(mass_range),1.0]),num=10000)
+            xfull = numpy.linspace(numpy.min(mass_range),numpy.min([numpy.max(mass_range),1.0]),num=int(nsamp))
 # default
             yfull = numpy.exp(-0.5*((numpy.log10(xfull)-numpy.log10(0.079))/0.69)**2)/xfull
             mcut = 1.0
@@ -615,7 +634,7 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
                 else:
                     mbs[-1] = numpy.max(mass_range)
             for iii in range(len(mbs)-1):
-                x = numpy.linspace(mbs[iii],mbs[iii+1],num=10000)
+                x = numpy.linspace(mbs[iii],mbs[iii+1],num=int(nsamp))
                 y = numpy.array(x**(-1.*alphas[iii]))
                 if len(yfull) > 0:
                     y = y*yfull[-1]/y[0]
@@ -625,18 +644,18 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
                     yfull = y
                     xfull = x
         f = interp1d(xfull,yfull)
-        xf = numpy.linspace(mass_range[0],mass_range[1],num=10000)
+        xf = numpy.linspace(mass_range[0],mass_range[1],num=int(nsamp))
         yf = f(xf)
         yf = yf-numpy.min(yf)
         yc = numpy.cumsum(yf)
         yc = yc-numpy.min(yc)
         yc = yc/numpy.max(yc)
         f = interp1d(yc,xf)
-        masses = f(numpy.random.uniform(size=num))
+        masses = f(numpy.random.uniform(size=int(num)))
 
 # uniform distribution (default)
     elif distribution.lower() == 'uniform' or distribution.lower() == 'flat':
-        masses = numpy.random.uniform(numpy.min(mass_range), numpy.max(mass_range), size=num)
+        masses = numpy.random.uniform(numpy.min(mass_range), numpy.max(mass_range), size=int(num))
 
 # wrong distribution
     else:
@@ -645,7 +664,8 @@ def simulateMasses(num,mass_range = [0.01,0.1],distribution='powerlaw',parameter
     return masses
 
 
-def simulateMassRatios(num,distribution='power-law',q_range=[0.1,1.0],gamma=1.8,parameters = {},verbose=False,**kwargs):
+
+def simulateMassRatios(num,distribution='power-law',q_range=[0.1,1.0],minq=0.1,maxq=1.0,gamma=1.8,parameters = {},nsamp=1000,verbose=False,**kwargs):
     '''
     :Purpose: 
 
@@ -660,7 +680,7 @@ def simulateMassRatios(num,distribution='power-law',q_range=[0.1,1.0],gamma=1.8,
         :param: distribution = 'uniform': set to one of the following to define the type of mass distribution to sample:
 
             * `uniform`: uniform distribution
-            * `powerlaw` or `power-law`: single power-law distribution, P(q) ~ q\^-gamma. You must specify the parameter `gamma` or set ``distribution`` to 'allen', 'burgasser', or 'reggiani'
+            * `powerlaw` or `power-law`: single power-law distribution, P(q) ~ q\^gamma. You must specify the parameter `gamma` or set ``distribution`` to 'allen', 'burgasser', or 'reggiani'
             * `allen`: power-law distribution with gamma = 1.8 based on `Allen (2007, ApJ 668, 492) <http://adsabs.harvard.edu/abs/2007ApJ...668..492A>`_
             * `burgasser`: power-law distribution with gamma = 4.2 based on `Burgasser et al (2006, ApJS 166, 585) <http://adsabs.harvard.edu/abs/2006ApJS..166..585B>`_
 
@@ -687,13 +707,13 @@ def simulateMassRatios(num,distribution='power-law',q_range=[0.1,1.0],gamma=1.8,
 
 # initial parameters
     allowed_distributions = ['uniform','flat','powerlaw','power-law','allen','burgasser','reggiani']
-    mn = kwargs.get('minq',0.1)
-    mn = kwargs.get('min',mn)
-    mx = kwargs.get('maxq',1.)
-    mx = kwargs.get('max',mx)
+    for f in ['ref','reference','set','method','relation','model']:
+        if f in list(kwargs.keys()): distribution = kwargs.get(f,distribution)
+
+    mn = kwargs.get('min',minq)
+    mx = kwargs.get('max',maxq)
     q_range = kwargs.get('q_range',[mn,mx])
     q_range = kwargs.get('range',q_range)
-    verbose = kwargs.get('verbose',False)
 
 # protective offset
     if q_range[0] == q_range[1]:
@@ -708,21 +728,21 @@ def simulateMassRatios(num,distribution='power-law',q_range=[0.1,1.0],gamma=1.8,
         if distribution.lower() == 'allen' or kwargs.get('allen',False) == True: parameters['gamma'] = 1.8
         if distribution.lower() == 'burgasser' or kwargs.get('burgasser',False) == True: parameters['gamma'] = 4.2
         if distribution.lower() == 'reggiani' or kwargs.get('reggiani',False) == True: parameters['gamma'] = 0.25
-        x = numpy.linspace(numpy.min(q_range),numpy.max(q_range),num=10000)
-        if parameters['gamma'] == 1.:
+        x = numpy.linspace(numpy.min(q_range),numpy.max(q_range),num=int(nsamp))
+        if parameters['gamma'] == -1.:
             y = numpy.log(x)
         else:
-            y = x**(1.+parameters['gamma'])
+            y = x**(parameters['gamma']+1.)
 #        print(x,y)
         y = y-numpy.min(y)
         y = y/numpy.max(y)
         f = interp1d(y,x)
 #        plt.plot(x,y)
-        q = f(numpy.random.uniform(size=num))
+        q = f(numpy.random.uniform(size=int(num)))
 
 # uniform distribution (default)
-    elif distribution.lower() == 'uniform' or distribution.lower() == 'flat':
-        q = numpy.random.uniform(numpy.min(q_range), numpy.max(q_range), size=num)
+    elif distribution.lower() in ['uniform','flat']:
+        q = numpy.random.uniform(numpy.min(q_range), numpy.max(q_range), size=int(num))
 
 # wrong distribution
     else:
@@ -732,7 +752,7 @@ def simulateMassRatios(num,distribution='power-law',q_range=[0.1,1.0],gamma=1.8,
 
 
 
-def simulateDistances(num,coordinate,model='juric',max_distance=[],magnitude=[],magnitude_limit=25.,magnitude_uncertainty=0.,center='sun',nsamp=1000,r0=8000.*u.pc,unit=u.pc,verbose=False,**kwargs):
+def simulateDistances(num,model='uniform',max_distance=[10.*u.pc],min_distance=[0.*u.pc],coordinate=properCoordinates([0.,0.]),magnitude=[],magnitude_limit=25.,magnitude_uncertainty=0.,center='sun',nsamp=1000,r0=8000.*u.pc,unit=u.pc,verbose=False,**kwargs):
     '''
     :Purpose: 
 
@@ -782,18 +802,15 @@ def simulateDistances(num,coordinate,model='juric',max_distance=[],magnitude=[],
     '''
 # check inputs
     allowed_models = ['juric','uniform']
+    for f in ['ref','reference','set','method','relation','distribution']:
+        if f in list(kwargs.keys()): model = kwargs.get(f,model)
 
-    try: c = list(coordinate)
-    except: c = coordinate       
-    if not isinstance(c,list): c = [c]
-    if not isinstance(c[0],SkyCoord):
-        try:
-            c = [properCoordinates(cd) for cd in c]
-        except:
-            raise ValueError('{} is not a proper coordinate input'.format(coordinate))
+    alts = ['distribution','relation','model']
+    for a in alts:
+        if not isinstance(kwargs.get(a,False),bool): model = kwargs[a]
 
 # check maximum distance
-    alts = ['max_distances','maxd','dmax','d_max']
+    alts = ['max_distances','maxd','max_d','dmax','d_max']
     for a in alts:
         if not isinstance(kwargs.get(a,False),bool): max_distance = kwargs[a]
     if not isinstance(max_distance,list):
@@ -801,6 +818,16 @@ def simulateDistances(num,coordinate,model='juric',max_distance=[],magnitude=[],
         except: dmax = max_distance
     else: dmax = max_distance
     if not isinstance(dmax,list): dmax = [dmax]
+
+# check minimum distance
+    alts = ['min_distances','mind','min_d','dmin','d_min']
+    for a in alts:
+        if not isinstance(kwargs.get(a,False),bool): min_distance = kwargs[a]
+    if not isinstance(min_distance,list):
+        try: dmin = list(min_distance)
+        except: dmin = min_distance
+    else: dmin = min_distance
+    if not isinstance(dmin,list): dmin = [dmin]
 
 # maximum distances not given - use magnitudes instead
     if len(dmax) == 0:
@@ -834,20 +861,58 @@ def simulateDistances(num,coordinate,model='juric',max_distance=[],magnitude=[],
         dmax = 10.*(10.**(0.2*(l_mag-numpy.random.normal(mag,e_mag))))
         dmax = [d*u.pc for d in dmax] # explicitly make pc for proper conversion
 
+# check distance units
     if len(dmax) == 0:
-        raise ValueError('\nSomething went wrong in computing limiting distances: {}'.format(dmax))
+        raise ValueError('\nSomething went wrong in computing maximum distance(s): {}'.format(dmax))
     if isUnit(dmax[0]) == True: dmax = [d.to(unit).value for d in dmax]
 
-# galactic model - should take r,z as inputs and **kwargs
-    if model.lower()=='juric':
+    if len(dmin) == 0:
+        raise ValueError('\nSomething went wrong in computing minimum distance(s): {}'.format(dmin))
+    if isUnit(dmin[0]) == True: dmin = [d.to(unit).value for d in dmin]
+
+# uniform distribution
+    if model.lower() == 'uniform':
+
+# single min/max distance
+        if len(dmax) == 1 and len(dmin) == 1:  
+            x = numpy.linspace(dmin[0],dmax[0],num=int(num))
+            y = x**3
+            y = y-numpy.min(y)
+            y = y/numpy.max(y)
+            f = interp1d(y,x)
+            return f(numpy.random.uniform(size=int(num)))*unit
+
+# multiple min/max distances
+        else:
+            while len(dmin) < num: dmin.append(dmin[-1])
+            while len(dmax) < num: dmax.append(dmin[-1])
+            distances = []
+            for i,dm in dmax:
+                x = numpy.linspace(dmin[i],dm,num=int(num))
+                y = x**3
+                y = y-numpy.min(y)
+                y = y/numpy.max(y)
+                f = interp1d(y,x)
+                distances.append(f(numpy.random.uniform()))
+            return distances*unit
+
+# galactic models - should take r,z as inputs and **kwargs
+    elif model.lower()=='juric':
         rho_function = galactic_density_juric
 #            rhod,rhotd,rhoh = galactic_density_juric(r,z,report='each')
-    elif model.lower() == 'uniform':
-        def __temp__(*args,**kwargs): return 1.
-        rho_function = __temp__
     else:
         raise ValueError('\nDo not recognize star count model {}; try {}'.format(model,allowed_models))
-            
+
+# check coordinate
+    try: c = list(coordinate)
+    except: c = coordinate       
+    if not isinstance(c,list): c = [c]
+    if not isinstance(c[0],SkyCoord):
+        try:
+            c = [properCoordinates(cd) for cd in c]
+        except:
+            raise ValueError('{} is not a proper coordinate input'.format(coordinate))
+
 # generate R,z vectors by different cases:
 # Case 1: single site line to single maximum distance - draw from a single distance distribution along this site line
     if len(c) == 1 and len(dmax) == 1: 
@@ -861,7 +926,7 @@ def simulateDistances(num,coordinate,model='juric',max_distance=[],magnitude=[],
         cdf = cdf-numpy.nanmin(cdf)
         cdf = cdf/numpy.nanmax(cdf)
         f = interp1d(cdf,d)
-        distances = f(numpy.random.uniform(0,1,num))
+        distances = f(numpy.random.uniform(0,1,int(num)))
         
 # single site line to multiple maximum distances - draw from multiple distance distributions along this site line
     elif len(c) == 1 and len(dmax) > 1: 
@@ -944,6 +1009,8 @@ def simulateUVW(num,age,model='aumer',verbose=False,unit=u.km/u.s,**kwargs):
     ages = numpy.array(ages)
 
     allowed_models = ['aumer']
+    for f in ['ref','reference','set','method','relation','distribution']:
+        if f in list(kwargs.keys()): model = kwargs.get(f,model)
 
 # aumer model
     if model.lower() == 'aumer':
